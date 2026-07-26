@@ -2,7 +2,7 @@ from fastapi import FastAPI,  HTTPException, status
 from pydantic import BaseModel
 app = FastAPI()
 
-class Task:
+class Task(BaseModel):
     def  __init__(self, id, title, isDone):
         self.id:int = id
         self.title:str= title
