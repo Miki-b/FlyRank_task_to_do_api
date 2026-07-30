@@ -76,7 +76,6 @@ async def get_tasks_by_id(id:int):
 @app.post("/tasks", status_code = 201)
 async def post_tasks(title: str):
     
-        
     if title is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -108,16 +107,12 @@ async def update_task(id: int, title: str ,done: bool):
             detail= "title must be text and done must be boolean"
             )
     
-    for task in Tasks:
-        if task.id == id :
-            task.title = title
-            task.isDone = done
-            return task
-    
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail= f"Task {id} not found"
-        )
+    try:
+        cursor.execute("update items set name=?,des=? where item_id=?",(i.name,i.des,i.item_id))
+        conn.commit()
+        return {"Message": "Item update successfully..."}
+    except Exception as e:
+          return HTTPException(status_code=400,detail="Unable to update record {e}")
 
 
 @app.delete("/tasks/{id}", status_code = 204)
