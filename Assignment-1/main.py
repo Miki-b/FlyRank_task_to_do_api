@@ -63,14 +63,15 @@ async def get_all_tasks():
 
 @app.get("/tasks/{id}")
 async def get_tasks_by_id(id:int):
-    for task in Tasks:
-        if task.id == id:
-            return task
+    try:
+        cursor.execute("select * from tasks where id = ?",(id))
+        row = cursor.fetchone()
+        if row is None:
+            raise HTTPException(status_code=404,detail="Record is not available")
+        return [{"id":row[0],"title":row[1],"done":row[2]}]
+    except Exception as e:
+          return HTTPException(status_code=400,detail="Unable to read one record {e}")
     
-    raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail= f"Task {id} not found"
-        )
     
 @app.post("/tasks", status_code = 201)
 async def post_tasks(title: str):
