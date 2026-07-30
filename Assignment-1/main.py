@@ -7,7 +7,6 @@ db = sqlite3.connect("tasks.db", check_same_thread=False)
 cursor = db.cursor()
 
 class Task(BaseModel):
-    id : int
     title: str
     done: bool
 
@@ -95,36 +94,33 @@ async def post_tasks(title: str):
             return HTTPException(status_code=400,detail="Unable to store {e}")
 
 @app.put("/tasks/{id}", status_code = 201)
-async def update_task(id: int, title: str ,done: bool):
-    if title is None or done is None:
+async def update_task(id: int, task:Task):
+    if task.title is None or task.done is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail= "title or done is empty"
         )
-    elif type(title) != str or type(done) != bool:
+    elif type(task.title) != str or type(task.done) != bool:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail= "title must be text and done must be boolean"
             )
     
     try:
-        cursor.execute("update items set name=?,des=? where item_id=?",(i.name,i.des,i.item_id))
-        conn.commit()
-        return {"Message": "Item update successfully..."}
+        cursor.execute("update tasks set title=?,done=? where id=?",(id,task.title,task.done))
+        db.commit()
+        return {"Message": "Task updated successfully..."}
     except Exception as e:
           return HTTPException(status_code=400,detail="Unable to update record {e}")
 
 
 @app.delete("/tasks/{id}", status_code = 204)
 async def delete_task(id: int):
-    for task in Tasks:
-        if task.id == id :
-            Tasks.remove(task)
-            return {"No Content"}
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail= f"Task {id} not found"
-        )
-        
+    try:
+        cursor.execute("Delete from items where item_id=?",(id))
+        db.commit()
+        return {"Message": "Item deleted successfully..."}
+    except Exception as e:
+          return HTTPException(status_code=400,detail="Unable to delete record {e}")
             
     
