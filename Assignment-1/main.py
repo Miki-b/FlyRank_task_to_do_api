@@ -1,18 +1,45 @@
 from fastapi import FastAPI,  HTTPException, status
 from pydantic import BaseModel
+import sqlite3
+
 app = FastAPI()
+db = sqlite3.connect("tasks.db", check_same_thread=False)
+cursor = db.cursor()
 
 class Task(BaseModel):
-    def  __init__(self, id, title, isDone):
-        self.id:int = id
-        self.title:str= title
-        self.isDone:bool = isDone
+    id : int
+    title: str
+    done: bool
 
-Tasks: list[Task] = [ 
-    Task ( 1,  "get up", True),
-    Task ( 2,  "brush teeth", True),
-    Task ( 3,  "eat breakfast", True),
-    Task ( 4,  "go to work", False),]
+cursor.execute(''' 
+            create table if not exists tasks(
+               id integer primary key autoincrement,
+               title text not null,
+               done boolean
+               )
+            ''')
+cursor.execute("SELECT COUNT(*) FROM tasks")
+count = cursor.fetchone()[0]
+
+
+if count == 0:
+    cursor.executemany(
+        "INSERT INTO tasks (title, done) VALUES (?, ?)",
+        [
+            ("Learn SQLite", 0),
+            ("Build a Todo API", 0),
+            ("Submit assignment", 1),
+        ],
+    )
+    print("Example tasks inserted.")
+else:
+    print("Database already contains data.")
+
+
+
+
+db.commit()
+   
 
 
 @app.get("/")
@@ -25,7 +52,13 @@ async def health():
 
 @app.get("/tasks")
 async def get_all_tasks():
-    return Tasks
+    try:
+        cursor.execute("select * from tasks")
+        rows = cursor.fetchall()
+        return [{"id":r[0],"title":r[1],"done":r[2] } for r in rows ]
+    except Exception as e:
+        return HTTPException(status_code=400,detail="Unable to read {e}")
+
 
 
 @app.get("/tasks/{id}")
@@ -54,10 +87,12 @@ async def post_tasks(title: str):
             detail= "title must be text"
         )
     else:
-        new_task = Task(id=len(Tasks)+1, title=title, isDone=False)
-        Tasks.append(new_task)
-        return {"done, here's your receipt"}
-
+        try:
+            cursor.execute(" Insert into tasks(title) values(?,?)",(title))
+            db.commit()
+            return {"message":"Task saved successfully...!"}
+        except Exception as e:
+            return HTTPException(status_code=400,detail="Unable to store {e}")
 
 @app.put("/tasks/{id}", status_code = 201)
 async def update_task(id: int, title: str ,done: bool):
