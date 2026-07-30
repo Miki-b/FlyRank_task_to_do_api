@@ -56,20 +56,25 @@ async def get_all_tasks():
         rows = cursor.fetchall()
         return [{"id":r[0],"title":r[1],"done":r[2] } for r in rows ]
     except Exception as e:
-        return HTTPException(status_code=400,detail="Unable to read {e}")
+        raise HTTPException(status_code=400,detail="Unable to read {e}")
 
 
 
 @app.get("/tasks/{id}")
 async def get_tasks_by_id(id:int):
     try:
-        cursor.execute("select * from tasks where id = ?",(id))
+        
+        
+        cursor.execute("select * from tasks where id = ?",(id,))
+        
         row = cursor.fetchone()
+        
+        print(row)
         if row is None:
             raise HTTPException(status_code=404,detail="Record is not available")
         return [{"id":row[0],"title":row[1],"done":row[2]}]
     except Exception as e:
-          return HTTPException(status_code=400,detail="Unable to read one record {e}")
+          raise HTTPException(status_code=400,detail="Unable to read one record {e}")
     
     
 @app.post("/tasks", status_code = 201)
@@ -80,18 +85,18 @@ async def post_tasks(title: str):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail= "title is empty"
         )
-    elif title is not str:
+    elif not isinstance(title, str):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail= "title must be text"
         )
     else:
         try:
-            cursor.execute(" Insert into tasks(title) values(?,?)",(title))
+            cursor.execute(" Insert into tasks(title) values(?)",(title,))
             db.commit()
             return {"message":"Task saved successfully...!"}
         except Exception as e:
-            return HTTPException(status_code=400,detail="Unable to store {e}")
+            raise HTTPException(status_code=400,detail="Unable to store {e}")
 
 @app.put("/tasks/{id}", status_code = 201)
 async def update_task(id: int, task:Task):
@@ -107,20 +112,20 @@ async def update_task(id: int, task:Task):
             )
     
     try:
-        cursor.execute("update tasks set title=?,done=? where id=?",(id,task.title,task.done))
+        cursor.execute("update tasks set title=?,done=? where id=?",(task.title,task.done, id))
         db.commit()
         return {"Message": "Task updated successfully..."}
     except Exception as e:
-          return HTTPException(status_code=400,detail="Unable to update record {e}")
+          raise HTTPException(status_code=400,detail="Unable to update record {e}")
 
 
 @app.delete("/tasks/{id}", status_code = 204)
 async def delete_task(id: int):
     try:
-        cursor.execute("Delete from items where item_id=?",(id))
+        cursor.execute("Delete from tasks where id=?",(id,))
         db.commit()
-        return {"Message": "Item deleted successfully..."}
+        return {"Message": "task deleted successfully..."}
     except Exception as e:
-          return HTTPException(status_code=400,detail="Unable to delete record {e}")
+          raise HTTPException(status_code=400,detail="Unable to delete record {e}")
             
     
