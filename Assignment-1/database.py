@@ -1,9 +1,13 @@
-from dotenv import load_dotenv 
-import psycopg 
+from dotenv import load_dotenv
+import psycopg
 import os
 from fastapi import HTTPException
+
+from models import Task
+
 load_dotenv()
-DATABASE_URL = os.getenv('DATABASE_URL')
+
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 conn = psycopg.connect(DATABASE_URL)
 conn.autocommit = True
@@ -19,6 +23,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 )
 """)
 
+
 cursor.execute("SELECT COUNT(*) FROM tasks")
 count = cursor.fetchone()[0]
 
@@ -29,77 +34,149 @@ if count == 0:
             ("Learn PostgreSQL", False),
             ("Build a Todo API", False),
             ("Submit assignment", True),
-        ],
+        ]
     )
+
 
 async def get_all_tasks():
     try:
-        cursor.execute("select * from tasks")
+        cursor.execute("SELECT * FROM tasks")
+
         rows = cursor.fetchall()
-        return [{"id":r[0],"title":r[1],"done":r[2] } for r in rows ]
-    except Exception as e:
-        raise HTTPException(status_code=400,detail="Unable to read {e}")
 
-async def get_tasks_by_id(id:int):
+        return [
+            {
+                "id": row[0],
+                "title": row[1],
+                "done": row[2]
+            }
+            for row in rows
+        ]
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unable to read: {e}"
+        )
+
+
+async def get_tasks_by_id(id: int):
     try:
-        
-        
-        cursor.execute("SELECT * FROM tasks WHERE id = $s",(id,))
-        
+        cursor.execute(
+            "SELECT * FROM tasks WHERE id = %s",
+            (id,)
+        )
+
         row = cursor.fetchone()
-        
-        print(row)
-        if row is None:
-            raise HTTPException(status_code=404,detail="Record is not available")
-        return [{"id":row[0],"title":row[1],"done":row[2]}]
-    except Exception as e:
-          raise HTTPException(status_code=400,detail="Unable to read one record {e}")
-    
-async def post_tasks(title: str):
-    if title is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail= "title is empty"
-        )
-    elif not isinstance(title, str):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail= "title must be text"
-        )
-    else:
-        try:
-            cursor.execute(" Insert into tasks(title) values(?)",(title,))
-            db.commit()
-            return {"message":"Task saved successfully...!"}
-        except Exception as e:
-            raise HTTPException(status_code=400,detail="Unable to store {e}")
-        
 
-async def update_task(id: int, task:Task):
-    if task.title is None or task.done is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail= "title or done is empty"
-        )
-    elif type(task.title) != str or type(task.done) != bool:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail= "title must be text and done must be boolean"
+        if row is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Record is not available"
             )
-    
-    try:
-        cursor.execute("update tasks set title=?,done=? where id=?",(task.title,task.done, id))
-        db.commit()
-        return {"Message": "Task updated successfully..."}
+
+        return {
+            "id": row[0],
+            "title": row[1],
+            "done": row[2]
+        }
+
+    except HTTPException:
+        raise
+
     except Exception as e:
-          raise HTTPException(status_code=400,detail="Unable to update record {e}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unable to read one record: {e}"
+        )
+
+
+async def post_tasks(title: str, done: bool):
+    try:
+        cursor.execute(
+            """
+            INSERT INTO tasks (title, done)
+            VALUES (%s, %s)
+            RETURNING *
+            """,
+            (title, done)
+        )
+
+        row = cursor.fetchone()
+
+        return {
+            "id": row[0],
+            "title": row[1],
+            "done": row[2]
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unable to store: {e}"
+        )
+
+
+async def update_task(id: int, task: Task):
+    try:
+        cursor.execute(
+            """
+            UPDATE tasks
+            SET title = %s, done = %s
+            WHERE id = %s
+            RETURNING *
+            """,
+            (task.title, task.done, id)
+        )
+
+        row = cursor.fetchone()
+
+        if row is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Task not found"
+            )
+
+        return {
+            "id": row[0],
+            "title": row[1],
+            "done": row[2]
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unable to update record: {e}"
+        )
+
 
 async def delete_task(id: int):
     try:
-        cursor.execute("Delete from tasks where id=?",(id,))
-        db.commit()
-        return {"Message": "task deleted successfully..."}
+        cursor.execute(
+            "DELETE FROM tasks WHERE id = %s RETURNING id",
+            (id,)
+        )
+
+        row = cursor.fetchone()
+
+        if row is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Task not found"
+            )
+
+        return {
+            "message": "Task deleted successfully"
+        }
+
+    except HTTPException:
+        raise
+
     except Exception as e:
-          raise HTTPException(status_code=400,detail="Unable to delete record {e}")
-            
-    
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unable to delete record: {e}"
+        )
